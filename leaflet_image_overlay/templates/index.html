@@ -1,0 +1,33 @@
+<html>
+<head>
+    <link rel="stylesheet" href="https://api.tiles.mapbox.com/mapbox.js/v1.6.4/mapbox.css" />
+    <link rel="stylesheet" href="/static/css/sidebar.css" />
+    <link rel="stylesheet" href="/static/css/slider.css" />
+    <link rel="stylesheet" href="/static/css/L.Control.Sidebar.css" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+</head>
+<body>
+    <div id="map" style="position:absolute;top:0;bottom:0;width:100%;"></div>
+    <div id="sidebar">
+        <br>
+        <br>
+        <input type="text" id="image_url_input">
+        <input type="text" id="northeast_input_lat" class="latlon-input"> 
+        <input type="text" id="northeast_input_lng" class="latlon-input"> 
+        <input type="text" id="southwest_input_lat" class="latlon-input">
+        <input type="text" id="southwest_input_lng" class="latlon-input">
+        <br>
+        <br>
+        <div id="slider"></div>
+    </div>
+    <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+    <script src="/static/js/lib/mousetrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/lodash.js/2.4.1/lodash.js"></script>
+    <script src="https://api.tiles.mapbox.com/mapbox.js/v1.6.4/mapbox.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="/static/js/lib/bootstrap-slider.js"></script>
+    <script src="/static/js/lib/L.Control.Sidebar.js"></script>
+    <script src="/static/js/lib/main.js"></script>
+</body>
+</html>
