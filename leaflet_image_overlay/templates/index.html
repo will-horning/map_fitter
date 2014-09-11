@@ -10,16 +10,23 @@
 <body>
     <div id="map" style="position:absolute;top:0;bottom:0;width:100%;"></div>
     <div id="sidebar">
+        <br><br>
+        Southwest Lat/Lon
         <br>
-        <br>
-        <input type="text" id="image_url_input">
-        <input type="text" id="northeast_input_lat" class="latlon-input"> 
-        <input type="text" id="northeast_input_lng" class="latlon-input"> 
         <input type="text" id="southwest_input_lat" class="latlon-input">
         <input type="text" id="southwest_input_lng" class="latlon-input">
         <br>
+        Northeast Lat/Lon
         <br>
-        <div id="slider"></div>
+        <input type="text" id="northeast_input_lat" class="latlon-input"> 
+        <input type="text" id="northeast_input_lng" class="latlon-input"> 
+        <br><br>
+        Opacity:
+        <br>
+        <div id="sidebar-slider"></div>
+        <br><br>
+        Leaflet latLngBounds:
+        <div id="latlngbounds"></div>
     </div>
     <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
     <script src="/static/js/lib/mousetrap.min.js"></script>
@@ -28,6 +35,7 @@
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
     <script src="/static/js/lib/bootstrap-slider.js"></script>
     <script src="/static/js/lib/L.Control.Sidebar.js"></script>
+    <script src="/static/js/lib/L.Control.MiniMap.js"></script>
     <script src="/static/js/lib/main.js"></script>
 </body>
 </html>

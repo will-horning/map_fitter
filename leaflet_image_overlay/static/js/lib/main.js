@@ -19,7 +19,7 @@
   image_url = config.DEFAULT_IMAGE_URL;
 
   $(document).ready(function() {
-    var OverlayEditor, changeImagePopup, map, overlayEdit, sidebar, sidebarOpenControl, slider;
+    var OverlayEditor, changeImagePopup, map, overlayEdit, sidebar, sidebarOpenControl, sidebar_open_content, slider;
     map = L.mapbox.map('map', 'examples.map-i86nkdio', {
       zoomControl: false
     });
@@ -27,14 +27,28 @@
     map.on('mousedown', function(e) {
       return map.dragging.enable();
     });
+    $('#latlngbounds').css('width', 220);
     OverlayEditor = (function() {
       function OverlayEditor(imgUrl, map, bounds, overlayOptions) {
-        var latLngBounds, thisOverlayEditor;
+        var latLngBounds, osm2, thisOverlayEditor;
         this.imgUrl = imgUrl;
         this.map = map;
         this.bounds = bounds;
         this.overlayOptions = overlayOptions;
         this.overlay = L.imageOverlay(this.imgUrl, this.bounds, this.overlayOptions).addTo(this.map);
+        this.overlay2 = L.imageOverlay(this.imgUrl, this.bounds, this.overlayOptions).addTo(this.map);
+        this.minimapZoom = 13;
+        osm2 = new L.TileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          minZoom: 0,
+          maxZoom: 13,
+          attribution: 'Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+        });
+        this.miniMapLayers = L.layerGroup([osm2, this.overlay2]);
+        this.miniMap = new L.Control.MiniMap(this.miniMapLayers, {
+          width: 300,
+          height: 300,
+          zoomLevelOffset: -3
+        }).addTo(this.map);
         latLngBounds = L.latLngBounds(this.bounds);
         this.ne = L.marker(latLngBounds.getNorthEast(), {
           draggable: true
@@ -48,6 +62,18 @@
         this.sw = L.marker(latLngBounds.getSouthWest(), {
           draggable: true
         }).addTo(this.map);
+        this.ne2 = L.marker(latLngBounds.getNorthEast(), {
+          draggable: true
+        }).addTo(this.miniMapLayers);
+        this.nw2 = L.marker(latLngBounds.getNorthWest(), {
+          draggable: true
+        }).addTo(this.miniMapLayers);
+        this.se2 = L.marker(latLngBounds.getSouthEast(), {
+          draggable: true
+        }).addTo(this.miniMapLayers);
+        this.sw2 = L.marker(latLngBounds.getSouthWest(), {
+          draggable: true
+        }).addTo(this.miniMapLayers);
         thisOverlayEditor = this;
         this.ne.on('drag', function(e) {
           thisOverlayEditor.bounds[1] = [e.target._latlng.lat, e.target._latlng.lng];
@@ -67,27 +93,46 @@
           thisOverlayEditor.bounds[0] = [e.target._latlng.lat, e.target._latlng.lng];
           return thisOverlayEditor.updateOverlay(thisOverlayEditor.bounds);
         });
+        this.ne2.on('drag', function(e) {
+          thisOverlayEditor.bounds[1] = [e.target._latlng.lat, e.target._latlng.lng];
+          return thisOverlayEditor.updateOverlay(thisOverlayEditor.bounds);
+        });
+        this.nw2.on('drag', function(e) {
+          thisOverlayEditor.bounds[1][0] = e.target._latlng.lat;
+          thisOverlayEditor.bounds[0][1] = e.target._latlng.lng;
+          return thisOverlayEditor.updateOverlay(thisOverlayEditor.bounds);
+        });
+        this.se2.on('drag', function(e) {
+          thisOverlayEditor.bounds[0][0] = e.target._latlng.lat;
+          thisOverlayEditor.bounds[1][1] = e.target._latlng.lng;
+          return thisOverlayEditor.updateOverlay(thisOverlayEditor.bounds);
+        });
+        this.sw2.on('drag', function(e) {
+          thisOverlayEditor.bounds[0] = [e.target._latlng.lat, e.target._latlng.lng];
+          return thisOverlayEditor.updateOverlay(thisOverlayEditor.bounds);
+        });
         this.mouseDown = false;
         this.lastLatLng = config.MAP_CENTER;
-        $('.leaflet-overlay-pane').mousedown(function(e) {
-          var lastLatLng, m, _i, _len, _ref, _results;
-          lastLatLng = thisOverlayEditor.map.mouseEventToLatLng(e);
-          thisOverlayEditor.mouseDown = true;
-          thisOverlayEditor.map.dragging.disable();
-          thisOverlayEditor.lastLatLng = thisOverlayEditor.map.mouseEventToLatLng(e);
-          _ref = [thisOverlayEditor.ne, thisOverlayEditor.nw, thisOverlayEditor.se, thisOverlayEditor.sw];
-          _results = [];
-          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-            m = _ref[_i];
-            _results.push(m.closePopup());
+        this.map.on('mousedown', function(e) {
+          var m, _i, _len, _ref, _results;
+          if (L.latLngBounds(thisOverlayEditor.bounds).contains(e.latlng)) {
+            thisOverlayEditor.lastLatLng = e.latlng;
+            thisOverlayEditor.mouseDown = true;
+            thisOverlayEditor.map.dragging.disable();
+            _ref = [thisOverlayEditor.ne, thisOverlayEditor.nw, thisOverlayEditor.se, thisOverlayEditor.sw];
+            _results = [];
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              m = _ref[_i];
+              _results.push(m.closePopup());
+            }
+            return _results;
           }
-          return _results;
         });
-        $('#map').mousemove(function(e) {
+        this.map.on('mousemove', function(e) {
           var currentLatLng, dLat, dLng;
           if (thisOverlayEditor.mouseDown) {
             thisOverlayEditor.map.dragging.disable();
-            currentLatLng = thisOverlayEditor.map.mouseEventToLatLng(e);
+            currentLatLng = e.latlng;
             dLat = currentLatLng.lat - thisOverlayEditor.lastLatLng.lat;
             dLng = currentLatLng.lng - thisOverlayEditor.lastLatLng.lng;
             thisOverlayEditor.bounds[0][0] += dLat;
@@ -99,37 +144,51 @@
             return thisOverlayEditor.map.dragging.enable();
           }
         });
-        $('.leaflet-overlay-pane').mouseup(function() {
+        this.map.on('mouseup', function(e) {
           thisOverlayEditor.mouseDown = false;
           return thisOverlayEditor.map.dragging.enable();
         });
+        this.r = L.rectangle(this.bounds);
+        this.r2 = L.rectangle(this.bounds);
+        this.neMinimap = L.marker([0, 0], {
+          draggable: true
+        });
+        this.neMinimap.addTo(map);
       }
 
       OverlayEditor.prototype.updateCornerMarkers = function(bounds) {
-        var latLngBounds, m, _i, _len, _ref, _results;
+        var latLngBounds, m, nelatlon, swlatlon, _i, _len, _ref;
         this.bounds = bounds;
         latLngBounds = L.latLngBounds(bounds);
         this.ne.setLatLng(latLngBounds.getNorthEast());
         this.nw.setLatLng(latLngBounds.getNorthWest());
         this.se.setLatLng(latLngBounds.getSouthEast());
         this.sw.setLatLng(latLngBounds.getSouthWest());
+        this.ne2.setLatLng(latLngBounds.getNorthEast());
+        this.nw2.setLatLng(latLngBounds.getNorthWest());
+        this.se2.setLatLng(latLngBounds.getSouthEast());
+        this.sw2.setLatLng(latLngBounds.getSouthWest());
         $('#northeast_input_lat').val(this.ne.getLatLng().lat);
         $('#northeast_input_lng').val(this.ne.getLatLng().lng);
         $('#southwest_input_lat').val(this.sw.getLatLng().lat);
         $('#southwest_input_lng').val(this.sw.getLatLng().lng);
         _ref = [this.ne, this.sw, this.se, this.nw];
-        _results = [];
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           m = _ref[_i];
-          _results.push(m.bindPopup(m.getLatLng().lat + ', ' + m.getLatLng().lng));
+          m.bindPopup(m.getLatLng().lat + ', ' + m.getLatLng().lng);
         }
-        return _results;
+        swlatlon = [this.sw.getLatLng().lat, this.sw.getLatLng().lng];
+        nelatlon = [this.ne.getLatLng().lat, this.ne.getLatLng().lng];
+        return $('#latlngbounds').html('L.latLngBounds([' + swlatlon.join(',') + ',' + nelatlon.join(',') + '])');
       };
 
       OverlayEditor.prototype.updateOverlay = function(bounds) {
         this.bounds = bounds;
-        map.removeLayer(this.overlay);
+        this.map.removeLayer(this.overlay);
         this.overlay = L.imageOverlay(this.imgUrl, this.bounds, this.overlayOptions).addTo(this.map);
+        this.miniMapLayers.removeLayer(this.overlay2);
+        this.overlay2 = L.imageOverlay(this.imgUrl, this.bounds, this.overlayOptions).addTo(this.map);
+        this.miniMapLayers.addLayer(this.overlay2);
         return this.updateCornerMarkers(bounds);
       };
 
@@ -142,7 +201,7 @@
       closeButton: false
     });
     changeImagePopup.setLatLng(config.MAP_CENTER);
-    changeImagePopup.setContent('<form id="popupForm"><input type="text" id="image_url_input" value="http://dcsymbols.com/chronology/dc1820.jpg"><input type="text" id="location_input" value="district of columbia"><input type="submit" value="submit"></form>');
+    changeImagePopup.setContent("<form id=\"popupForm\">\n    <input type=\"text\" id=\"image_url_input\" value=\"http://dcsymbols.com/chronology/dc1820.jpg\">\n    <input type=\"text\" id=\"location_input\" value=\"District of Columbia\">\n    <input type=\"submit\" value=\"submit\">\n</form>");
     changeImagePopup.openOn(map);
     $('#popupForm').submit(function(e) {
       var params;
@@ -179,12 +238,25 @@
         }
       });
     });
+    L.Control.WidthSlider = L.Control.extend({
+      options: {
+        position: 'topright'
+      },
+      onAdd: function(map) {
+        var controlDiv, controlUI;
+        controlDiv = L.DomUtil.create('div', 'width-slider-control');
+        controlUI = L.DomUtil.create('div', 'width-slider', controlDiv);
+        controlUI.title = 'Width Slider';
+        return controlDiv;
+      }
+    });
     sidebar = L.control.sidebar('sidebar', {
       position: 'left',
       autoPan: false
     });
     map.addControl(sidebar);
-    slider = $('#slider').slider({
+    $('#sidebar-slider').css('width', 190);
+    slider = $('#sidebar-slider').slider({
       min: 0,
       max: 1.0,
       step: 0.01,
@@ -197,7 +269,7 @@
       return overlayEdit.updateOverlay(overlayEdit.bounds);
     });
     sidebar.hide();
-    $('.leaflet-sidebar').css('width', 300);
+    $('.leaflet-sidebar').css('width', 250);
     L.Control.SidebarOpen = L.Control.extend({
       options: {
         position: 'topleft'
@@ -217,12 +289,13 @@
     sidebar.on('show', function() {
       return sidebarOpenControl.removeFrom(map);
     });
+    sidebar_open_content = "<button type=\"submit\" class=\"btn btn-default\">\n    <span class=\"glyphicon glyphicon-cog\"></span> \n</button>";
     sidebar.on('hidden', function() {
       sidebarOpenControl.addTo(map);
-      return $('.leaflet-control-sidebar-open-interior').append('<button type="submit" class="btn btn-default"><span class="glyphicon glyphicon-cog"></span> </button>');
+      return $('.leaflet-control-sidebar-open-interior').append(sidebar_open_content);
     });
     map.addControl(sidebarOpenControl);
-    $('.leaflet-control-sidebar-open-interior').append('<button type="submit" class="btn btn-default"><span class="glyphicon glyphicon-cog"></span> </button>');
+    $('.leaflet-control-sidebar-open-interior').append(sidebar_open_content);
     return $('.latlon-input').bind('keypress', function(e) {
       var neLatLng, swLatLng;
       if (e.keyCode === 13 || e.which === 13) {
