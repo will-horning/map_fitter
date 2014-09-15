@@ -20,6 +20,126 @@ $(document).ready ->
     class OverlayEditor
         constructor: (@imgUrl, @map, @bounds, @overlayOptions) ->
             @overlay = L.imageOverlay(@imgUrl, @bounds, @overlayOptions).addTo(@map)
+            @hidden = false
+            @landmarkPairs = []
+            @mouseDown = false
+            @lastLatLng = config.MAP_CENTER   
+            @initMinimap()
+            [@ne, @nw, @se, @sw] = @createCornerMarkers(@map)
+            miniMapCorners = @createCornerMarkers(@miniMapLayers)
+            [@neMinimap, @nwMinimap, @seMinimap, @swMinimap] = miniMapCorners
+            @enableDragging()
+
+        draggingHandler: (e) =>
+            if e.type == 'mousedown'
+                if L.latLngBounds(@bounds).contains(e.latlng) and not @hidden
+                    @lastLatLng = e.latlng
+                    @mouseDown = true
+                    @map.dragging.disable()
+                    m.closePopup() for m in [@ne, @nw, @se, @sw]
+            else if e.type == 'mousemove'
+                if @mouseDown
+                    @map.dragging.disable()
+                    currentLatLng = e.latlng
+                    dLat = currentLatLng.lat - @lastLatLng.lat
+                    dLng = currentLatLng.lng - @lastLatLng.lng
+                    bounds = [
+                        [@bounds[0][0] + dLat, @bounds[0][1] + dLng],
+                        [@bounds[1][0] + dLat, @bounds[1][1] + dLng]
+                    ]
+                    @updateOverlay bounds
+                    @lastLatLng = currentLatLng
+                    @map.dragging.enable()
+            else if e.type == 'mouseup'
+                if @mouseDown
+                    @mouseDown = false
+                    @map.dragging.enable()
+
+        enableDragging: ->
+            @map.on('mousedown', @draggingHandler)
+            @map.on('mousemove', @draggingHandler)
+            @map.on('mouseup', @draggingHandler)
+
+        disableDragging: ->
+            @map.off('mousedown', @draggingHandler)
+            @map.off('mousemove', @draggingHandler)
+            @map.off('mouseup', @draggingHandler)
+
+        placeLandmark: (e) => 
+            if not @landmark1
+                @landmark1 = L.circleMarker(e.latlng, {fillColor: '#ff0000', fillOpacity: 0.5}).addTo(map)
+                @show()
+            else if @landmark1 and L.latLngBounds(@bounds).contains(e.latlng)
+                @landmark2 = L.circleMarker(e.latlng, {fillColor: '#0000ff', fillOpacity: 0.5}).addTo(map)
+                @landmarkPairs.push [@landmark1, @landmark2]
+                if @landmarkPairs.length == 2
+                    @fitToLandmark()
+                    @map.off('click', @placeLandmark)
+                else
+                    @hide()
+                [@landmark1, @landmark2] = [null, null]
+                @enableDragging()
+
+        placeLandmarkPair: () ->
+            for pair in @landmarkPairs
+                @map.removeLayer(m) for m in pair
+            @landmarkPairs = []
+            @disableDragging()
+            @map.on('click', @placeLandmark)
+            @hide()
+
+        fitToLandmark: () ->
+            sw = @sw.getLatLng()
+            ne = @ne.getLatLng()
+            overlayLatLng1 = @landmarkPairs[0][1].getLatLng()
+            overlayLatLng2 = @landmarkPairs[1][1].getLatLng()
+            mapLatLng1 = @landmarkPairs[0][0].getLatLng()
+            mapLatLng2 = @landmarkPairs[1][0].getLatLng()
+            dx = overlayLatLng2.lng - overlayLatLng1.lng
+            dy = overlayLatLng2.lat - overlayLatLng1.lat
+            rx1 = (overlayLatLng1.lng - sw.lng) / dx
+            ry1 = (overlayLatLng1.lat - sw.lat) / dy
+            rx2 = (ne.lng - overlayLatLng2.lng) / dx
+            ry2 = (ne.lat - overlayLatLng2.lat) / dy
+            dxMap = mapLatLng2.lng - mapLatLng1.lng
+            dyMap = mapLatLng2.lat - mapLatLng1.lat
+            leftPadding = dxMap * rx1
+            rightPadding = dxMap * rx2
+            bottomPadding = dyMap * ry1
+            topPadding = dyMap * ry2
+            bounds = [[0,0], [0,0]]
+            bounds[0][0] = mapLatLng1.lat - bottomPadding
+            bounds[1][0] = mapLatLng2.lat + topPadding
+            bounds[0][1] = mapLatLng1.lng - leftPadding
+            bounds[1][1] = mapLatLng2.lng + rightPadding
+            @updateOverlay bounds
+
+
+        setNortheast: (latLng) ->
+            @updateOverlay [@bounds[0], [latLng.lat, latLng.lng]]
+
+        setNorthwest: (latLng) ->
+            @updateOverlay [[@bounds[0][0], latLng.lng], [latLng.lat, @bounds[1][1]]]
+
+        setSoutheast: (latLng) ->
+            @updateOverlay [[latLng.lat, @bounds[0][1]], [@bounds[1][0], latLng.lng]]
+
+        setSouthwest: (latLng) ->
+            @updateOverlay [[latLng.lat, latLng.lng], @bounds[1]]
+
+        createCornerMarkers: (target) ->
+            latLngBounds = L.latLngBounds(@bounds)
+            ne = L.marker(latLngBounds.getNorthEast(), {draggable: true}).addTo(target)
+            nw = L.marker(latLngBounds.getNorthWest(), {draggable: true}).addTo(target)
+            se = L.marker(latLngBounds.getSouthEast(), {draggable: true}).addTo(target)
+            sw = L.marker(latLngBounds.getSouthWest(), {draggable: true}).addTo(target)
+            ne.on('drag', (e) => @setNortheast(e.target._latlng))
+            nw.on('drag', (e) => @setNorthwest(e.target._latlng))
+            se.on('drag', (e) => @setSoutheast(e.target._latlng))
+            sw.on('drag', (e) => @setSouthwest(e.target._latlng))
+            return [ne, nw, se, sw]
+
+        initMinimap: () ->
             @overlay2 = L.imageOverlay(@imgUrl, @bounds, @overlayOptions).addTo(@map)
             @minimapZoom = 13
             osm2 = new L.TileLayer(
@@ -35,102 +155,7 @@ $(document).ready ->
                 @miniMapLayers, 
                 {width: 300, height: 300, zoomLevelOffset: -3}
             ).addTo(@map)
-            # @miniMap._miniMap.setMaxBounds(@bounds)
-            latLngBounds = L.latLngBounds(@bounds)
-            @ne = L.marker(latLngBounds.getNorthEast(), {draggable: true}).addTo(@map)
-            @nw = L.marker(latLngBounds.getNorthWest(), {draggable: true}).addTo(@map)
-            @se = L.marker(latLngBounds.getSouthEast(), {draggable: true}).addTo(@map)
-            @sw = L.marker(latLngBounds.getSouthWest(), {draggable: true}).addTo(@map)
-            @ne2 = L.marker(latLngBounds.getNorthEast(), {draggable: true}).addTo(@miniMapLayers)
-            @nw2 = L.marker(latLngBounds.getNorthWest(), {draggable: true}).addTo(@miniMapLayers)
-            @se2 = L.marker(latLngBounds.getSouthEast(), {draggable: true}).addTo(@miniMapLayers)
-            @sw2 = L.marker(latLngBounds.getSouthWest(), {draggable: true}).addTo(@miniMapLayers)
 
-            thisOverlayEditor = this
-            # @map.on('dragend', (e) -> thisOverlayEditor.miniMap._miniMap.setZoom(thisOverlayEditor.minimapZoom))
-            # @map.on('dragend', (e) -> console.log 'fo')
-            @ne.on('drag', (e) ->
-                thisOverlayEditor.bounds[1] = [e.target._latlng.lat, e.target._latlng.lng]
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @nw.on('drag', (e) ->
-                thisOverlayEditor.bounds[1][0] = e.target._latlng.lat
-                thisOverlayEditor.bounds[0][1] = e.target._latlng.lng
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @se.on('drag', (e) ->
-                thisOverlayEditor.bounds[0][0] = e.target._latlng.lat
-                thisOverlayEditor.bounds[1][1] = e.target._latlng.lng
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @sw.on('drag', (e) ->
-                thisOverlayEditor.bounds[0] = [e.target._latlng.lat, e.target._latlng.lng]
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @ne2.on('drag', (e) ->
-                thisOverlayEditor.bounds[1] = [e.target._latlng.lat, e.target._latlng.lng]
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @nw2.on('drag', (e) ->
-                thisOverlayEditor.bounds[1][0] = e.target._latlng.lat
-                thisOverlayEditor.bounds[0][1] = e.target._latlng.lng
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @se2.on('drag', (e) ->
-                thisOverlayEditor.bounds[0][0] = e.target._latlng.lat
-                thisOverlayEditor.bounds[1][1] = e.target._latlng.lng
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @sw2.on('drag', (e) ->
-                thisOverlayEditor.bounds[0] = [e.target._latlng.lat, e.target._latlng.lng]
-                thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-            )
-            @mouseDown = false
-            @lastLatLng = config.MAP_CENTER   
-            @map.on('mousedown', (e) ->
-                if L.latLngBounds(thisOverlayEditor.bounds).contains(e.latlng)
-                    thisOverlayEditor.lastLatLng = e.latlng
-                    thisOverlayEditor.mouseDown = true
-                    thisOverlayEditor.map.dragging.disable()
-                    m.closePopup() for m in [
-                        thisOverlayEditor.ne, 
-                        thisOverlayEditor.nw, 
-                        thisOverlayEditor.se, 
-                        thisOverlayEditor.sw
-                    ]
-            )
-            @map.on('mousemove', (e) ->
-                if thisOverlayEditor.mouseDown
-                    thisOverlayEditor.map.dragging.disable()
-                    currentLatLng = e.latlng
-                    dLat = currentLatLng.lat - thisOverlayEditor.lastLatLng.lat
-                    dLng = currentLatLng.lng - thisOverlayEditor.lastLatLng.lng
-                    thisOverlayEditor.bounds[0][0] += dLat
-                    thisOverlayEditor.bounds[1][0] += dLat
-                    thisOverlayEditor.bounds[0][1] += dLng
-                    thisOverlayEditor.bounds[1][1] += dLng
-                    thisOverlayEditor.updateOverlay thisOverlayEditor.bounds
-                    thisOverlayEditor.lastLatLng = currentLatLng
-                    thisOverlayEditor.map.dragging.enable()
-            )
-            @map.on('mouseup', (e) ->
-                thisOverlayEditor.mouseDown = false
-                thisOverlayEditor.map.dragging.enable()
-            )
-            @r = L.rectangle(@bounds)
-            @r2 = L.rectangle(@bounds)
-            @neMinimap = L.marker([0,0], {draggable: true})
-            @neMinimap.addTo(map)
-            # @nwMinimap = L.marker([0,0])
-            # @seMinimap = L.marker([0,0])
-            # @swMinimap = L.marker([0,0])
-
-            # @map.on('zoomend', (e) ->
-            #     thisOverlayEditor.updateMinimap()
-            # )
-            # @map.on('move', (e) ->
-            #     thisOverlayEditor.updateMinimap()
-            # )
         updateCornerMarkers: (bounds) ->
             @bounds = bounds
             latLngBounds = L.latLngBounds(bounds)
@@ -138,21 +163,28 @@ $(document).ready ->
             @nw.setLatLng(latLngBounds.getNorthWest())
             @se.setLatLng(latLngBounds.getSouthEast())
             @sw.setLatLng(latLngBounds.getSouthWest())
-            @ne2.setLatLng(latLngBounds.getNorthEast())
-            @nw2.setLatLng(latLngBounds.getNorthWest())
-            @se2.setLatLng(latLngBounds.getSouthEast())
-            @sw2.setLatLng(latLngBounds.getSouthWest())
+            @neMinimap.setLatLng(latLngBounds.getNorthEast())
+            @nwMinimap.setLatLng(latLngBounds.getNorthWest())
+            @seMinimap.setLatLng(latLngBounds.getSouthEast())
+            @swMinimap.setLatLng(latLngBounds.getSouthWest())
             $('#northeast_input_lat').val(@ne.getLatLng().lat)
             $('#northeast_input_lng').val(@ne.getLatLng().lng)
             $('#southwest_input_lat').val(@sw.getLatLng().lat)
             $('#southwest_input_lng').val(@sw.getLatLng().lng)
             m.bindPopup(m.getLatLng().lat + ', ' + m.getLatLng().lng) for m in [@ne, @sw, @se, @nw]
-            swlatlon = [@sw.getLatLng().lat, @sw.getLatLng().lng]
-            nelatlon = [@ne.getLatLng().lat, @ne.getLatLng().lng]
-            $('#latlngbounds').html('L.latLngBounds([' + swlatlon.join(',') + ',' + nelatlon.join(',') + '])')
-
 
         updateOverlay: (bounds) ->
+            for pair in @landmarkPairs
+                latlng = pair[1].getLatLng()
+                dx = (latlng.lng - @bounds[0][1])
+                dy = (latlng.lat - @bounds[0][0])
+                overlayWidth = @bounds[1][1] - @bounds[0][1]
+                overlayHeight = @bounds[1][0] - @bounds[0][0]
+                newOverlayWidth = bounds[1][1] - bounds[0][1]
+                newOverlayHeight = bounds[1][0] - bounds[0][0]
+                lat = bounds[0][0] + newOverlayHeight * dy / overlayHeight
+                lng = bounds[0][1] + newOverlayWidth * dx / overlayWidth
+                pair[1].setLatLng([lat, lng])
             @bounds = bounds        
             @map.removeLayer(@overlay)
             @overlay = L.imageOverlay(@imgUrl, @bounds, @overlayOptions).addTo(@map)
@@ -160,21 +192,50 @@ $(document).ready ->
             @overlay2 = L.imageOverlay(@imgUrl, @bounds, @overlayOptions).addTo(@map)
             @miniMapLayers.addLayer(@overlay2)
             @updateCornerMarkers bounds
-            # @updateMinimap()
+            console.log @landmarkPairs
 
+        hide: ->
+            if not @hidden
+                @map.removeLayer @overlay
+                @map.removeLayer @ne
+                @map.removeLayer @nw
+                @map.removeLayer @se
+                @map.removeLayer @sw
+                @hidden = true
         
+        show: ->
+            if @hidden
+                @map.addLayer @overlay
+                @map.addLayer @ne
+                @map.addLayer @nw
+                @map.addLayer @se
+                @map.addLayer @sw
+                @hidden = false
+
+        toggle: ->
+            if @hidden
+                @show()
+            else
+                @hide()
 
     overlayEdit = null 
     changeImagePopup = L.popup({closeOnClick: false, closeButton: false})
     changeImagePopup.setLatLng(config.MAP_CENTER)
     changeImagePopup.setContent("""
         <form id="popupForm">
-            <input type="text" id="image_url_input" value="http://dcsymbols.com/chronology/dc1820.jpg">
-            <input type="text" id="location_input" value="District of Columbia">
-            <input type="submit" value="submit">
+        Image URL:
+        <br>
+        <input type="text" id="image_url_input" value="http://dcsymbols.com/chronology/dc1820.jpg">
+        <br>
+        Location (Address or city name):
+        <br>
+        <input type="text" id="location_input" value="District of Columbia">
+        <br>
+        <input type="submit" value="Submit">
         </form>
         """
     )
+   
     changeImagePopup.openOn(map)
     $('#popupForm').submit((e) ->
         e.preventDefault()
@@ -195,6 +256,10 @@ $(document).ready ->
                 overlayEdit.updateOverlay
                 map.closePopup(changeImagePopup)
                 map.fitBounds([southwest, northeast], {padding: [100, 100]})  
+
+                $('#landmark-button').click(->
+                    overlayEdit.placeLandmarkPair()
+                )
         )
     )       
 
@@ -204,14 +269,15 @@ $(document).ready ->
             controlDiv = L.DomUtil.create('div', 'width-slider-control')     
             controlUI = L.DomUtil.create('div', 'width-slider', controlDiv)
             controlUI.title = 'Width Slider'
-
             return controlDiv
     })
 
     sidebar = L.control.sidebar('sidebar', {position:'left', autoPan: false})
     map.addControl(sidebar)
     $('#sidebar-slider').css('width', 190)
-    slider = $('#sidebar-slider').slider({min: 0, max: 1.0, step: 0.01, value: 0.5 })
+    slider = $('#sidebar-slider').slider({
+        min: 0, max: 1.0, step: 0.01, value: 0.5 
+    })
     slider.on('slide', (e) -> 
         overlayEdit.overlayOptions = {opacity: e.value}
         overlayEdit.updateOverlay overlayEdit.bounds
@@ -226,7 +292,11 @@ $(document).ready ->
                 .addListener(controlDiv, 'click', L.DomEvent.stopPropagation)
                 .addListener(controlDiv, 'click', L.DomEvent.preventDefault)
                 .addListener(controlDiv, 'click', -> sidebar.toggle())      
-            controlUI = L.DomUtil.create('div', 'leaflet-control-sidebar-open-interior', controlDiv)
+            controlUI = L.DomUtil.create(
+                'div', 
+                'leaflet-control-sidebar-open-interior', 
+                controlDiv
+            )
             controlUI.title = 'Map Commands'
             return controlDiv
     })
@@ -246,7 +316,13 @@ $(document).ready ->
 
     $('.latlon-input').bind('keypress', (e) ->
         if e.keyCode == 13 or e.which == 13
-            neLatLng = [parseFloat($('#northeast_input_lat').val()), parseFloat($('#northeast_input_lng').val())]
-            swLatLng = [parseFloat($('#southwest_input_lat').val()), parseFloat($('#southwest_input_lng').val())]
+            neLatLng = [
+                parseFloat($('#northeast_input_lat').val()), 
+                parseFloat($('#northeast_input_lng').val())
+            ]
+            swLatLng = [
+                parseFloat($('#southwest_input_lat').val()), 
+                parseFloat($('#southwest_input_lng').val())
+            ]
             overlayEdit.updateOverlay [swLatLng, neLatLng]
     )        
