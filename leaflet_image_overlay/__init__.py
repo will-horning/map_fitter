@@ -3,7 +3,7 @@ from flask.ext.cake import Cake
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
-cake = Cake(app)
+# cake = Cake(app)
 # mongo_url = os.environ.get('MONGOHQ_URL')
 # if mongo_url:
 #     mongo_conn = pymongo.Connection(mongo_url)
