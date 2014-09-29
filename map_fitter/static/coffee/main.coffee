@@ -1,5 +1,5 @@
 config = require './config.coffee'
-
+ 
 $(document).ready ->
     map = L.mapbox.map('map', 'willhorning.ja8hjdhd', {zoomControl: false})
     map.setView(config.MAP_CENTER, config.MAP_ZOOM)
@@ -36,17 +36,24 @@ $(document).ready ->
             </div>
             <button type="submit" class="btn btn-primary btn-block">Submit</button>
         </form>                
-
         """
     )
     changeImagePopup.openOn(map)
     $('#popupForm').submit((e) ->
         e.preventDefault()
         params = {q: $('#location_input').val(), format: 'json'}
-        $.getJSON(config.NOMINATIM_URL, params, (loc) ->
-            if loc? and loc.length > 0
-                map.panTo([loc[0].lat, loc[0].lon])    
-                bounds = (parseFloat(f) for f in loc[0].boundingbox)
+        $.getJSON(config.NOMINATIM_URL, params, (locs) ->
+            if locs? and locs.length > 0
+                loc = locs[0]
+                max_area = 0
+                for l in locs
+                    bounds = (parseFloat(f) for f in l.boundingbox)
+                    area = Math.abs((bounds[1] - bounds[0]) * (bounds[3] - bounds[2]))
+                    if area > max_area
+                        loc = l
+                        max_area = area
+                map.panTo([loc.lat, loc.lon])    
+                bounds = (parseFloat(f) for f in loc.boundingbox)
                 northeast = [bounds[1], bounds[3]]
                 southwest = [bounds[0], bounds[2]]
                 overlayEdit = require('./overlay-editor.coffee')(
@@ -55,7 +62,7 @@ $(document).ready ->
                     [southwest, northeast],
                     {opacity: 0.5}
                 )
-                overlayEdit.lastLatLng = [loc[0].lat, loc[0].lon]
+                overlayEdit.lastLatLng = [loc.lat, loc.lon]
                 overlayEdit.updateOverlay
                 map.closePopup(changeImagePopup)
                 map.fitBounds([southwest, northeast], {padding: [100, 100]})  

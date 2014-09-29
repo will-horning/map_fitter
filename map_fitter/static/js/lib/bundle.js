@@ -35,7 +35,7 @@ $(document).ready(function() {
     closeButton: false
   });
   changeImagePopup.setLatLng(config.MAP_CENTER);
-  changeImagePopup.setContent("<form id=\"popupForm\">\n    <div class=\"form-group\">\n        <label for=\"imageUrl\">Image URL</label>\n        <input type=\"text\" class=\"form-control\" id=\"image_url_input\" value=\"/static/images/lenfant_map.jpg\">\n    </div>\n    <div class=\"form-group\">\n        <label for=\"location\">Location (Address or city name)</label>\n        <input type=\"text\" class=\"form-control\" id=\"location_input\" value=\"District of Columbia\">\n    </div>\n    <button type=\"submit\" class=\"btn btn-primary btn-block\">Submit</button>\n</form>                \n");
+  changeImagePopup.setContent("<form id=\"popupForm\">\n    <div class=\"form-group\">\n        <label for=\"imageUrl\">Image URL</label>\n        <input type=\"text\" class=\"form-control\" id=\"image_url_input\" value=\"/static/images/lenfant_map.jpg\">\n    </div>\n    <div class=\"form-group\">\n        <label for=\"location\">Location (Address or city name)</label>\n        <input type=\"text\" class=\"form-control\" id=\"location_input\" value=\"District of Columbia\">\n    </div>\n    <button type=\"submit\" class=\"btn btn-primary btn-block\">Submit</button>\n</form>                ");
   changeImagePopup.openOn(map);
   $('#popupForm').submit(function(e) {
     var params;
@@ -44,16 +44,36 @@ $(document).ready(function() {
       q: $('#location_input').val(),
       format: 'json'
     };
-    return $.getJSON(config.NOMINATIM_URL, params, function(loc) {
-      var bounds, f, northeast, southwest;
-      if ((loc != null) && loc.length > 0) {
-        map.panTo([loc[0].lat, loc[0].lon]);
+    return $.getJSON(config.NOMINATIM_URL, params, function(locs) {
+      var area, bounds, f, l, loc, max_area, northeast, southwest, _i, _len;
+      if ((locs != null) && locs.length > 0) {
+        loc = locs[0];
+        max_area = 0;
+        for (_i = 0, _len = locs.length; _i < _len; _i++) {
+          l = locs[_i];
+          bounds = (function() {
+            var _j, _len1, _ref, _results;
+            _ref = l.boundingbox;
+            _results = [];
+            for (_j = 0, _len1 = _ref.length; _j < _len1; _j++) {
+              f = _ref[_j];
+              _results.push(parseFloat(f));
+            }
+            return _results;
+          })();
+          area = Math.abs((bounds[1] - bounds[0]) * (bounds[3] - bounds[2]));
+          if (area > max_area) {
+            loc = l;
+            max_area = area;
+          }
+        }
+        map.panTo([loc.lat, loc.lon]);
         bounds = (function() {
-          var _i, _len, _ref, _results;
-          _ref = loc[0].boundingbox;
+          var _j, _len1, _ref, _results;
+          _ref = loc.boundingbox;
           _results = [];
-          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-            f = _ref[_i];
+          for (_j = 0, _len1 = _ref.length; _j < _len1; _j++) {
+            f = _ref[_j];
             _results.push(parseFloat(f));
           }
           return _results;
@@ -63,7 +83,7 @@ $(document).ready(function() {
         overlayEdit = require('./overlay-editor.coffee')($('#image_url_input').val(), map, [southwest, northeast], {
           opacity: 0.5
         });
-        overlayEdit.lastLatLng = [loc[0].lat, loc[0].lon];
+        overlayEdit.lastLatLng = [loc.lat, loc.lon];
         overlayEdit.updateOverlay;
         map.closePopup(changeImagePopup);
         map.fitBounds([southwest, northeast], {
